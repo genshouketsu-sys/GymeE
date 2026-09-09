@@ -2,6 +2,7 @@
 
 - coach/dist：教练端完整 HTML、CSS、JavaScript 和图片资源。
 - member/dist：学员端完整 HTML、CSS、JavaScript 和图片资源。
+- supabase/：后端数据库 schema（迁移 SQL + 权限测试），见 [supabase/README.md](supabase/README.md)。两端前端目前还没有接上它，仍在读写死数据。
 
 ## 本地运行
 
