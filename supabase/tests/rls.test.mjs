@@ -49,6 +49,11 @@ const seed = `
   insert into public.progress_photos (member_id, photo_url, visibility) values
     ('${TANAKA}', 'https://x/private.jpg', 'private'),
     ('${SATO}', 'https://x/shared.jpg', 'shared_with_coach');
+
+  insert into public.conversations (id, coach_id, member_id) values
+    ('00000000-0000-0000-0000-0000000000c1', '${KENTA}', '${TANAKA}');
+  insert into public.messages (id, conversation_id, sender_id, body) values
+    ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000c1', '${KENTA}', '元のメッセージ');
 `;
 
 const main = async () => {
@@ -90,6 +95,21 @@ const main = async () => {
 
   const ownMetricAsMember = await asUser(db, TANAKA, `select weight_kg from public.body_metrics where member_id = '${TANAKA}'`);
   check('member 田中 can read his OWN body metrics', ownMetricAsMember, [{ weight_kg: '72.4' }]);
+
+  // Regression test for a real bug: the "mark read" UPDATE policy's
+  // `with check (sender_id = messages.sender_id)` was a tautology (both
+  // sides resolve to the NEW row under RLS), so a participant "marking a
+  // message read" could actually rewrite its body/sender_id too. A trigger
+  // now pins every column but read_at back to its old value.
+  const tampered = await asUser(
+    db, TANAKA,
+    `update public.messages set read_at = now(), body = '田中が書き換えた', sender_id = '${TANAKA}'
+     where id = '00000000-0000-0000-0000-0000000000d1'
+     returning body, sender_id, (read_at is not null) as was_marked_read`
+  );
+  check('marking a message read cannot also rewrite its body/sender_id', tampered, [
+    { body: '元のメッセージ', sender_id: KENTA, was_marked_read: true },
+  ]);
 
   const passCount = results.filter(Boolean).length;
   console.log(`\n${passCount}/${results.length} RLS behavior checks passed.`);
