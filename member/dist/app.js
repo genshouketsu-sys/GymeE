@@ -50,7 +50,7 @@ function renderHome(){
 async function loadHome(){
   try{
     const uid=decodeJwtSub(DEV_JWT),today=tokyoDate(0),weekAgo=tokyoDate(-6),tomorrow=tokyoDate(1);
-    const [me,plansRes,targetRes,mealsRes,metricRes,msgRes,weekSessionsRes]=await Promise.all([
+    const [me,plansRes,targetRes,mealsRes,metricRes,msgRes,weekSessionsRes,unreadMsgsRes,notifsRes]=await Promise.all([
       pg(`/users?select=display_name&id=eq.${uid}`),
       pg(`/training_plans?select=name,workouts(id,scheduled_date,duration_min,workout_exercises(order_index,target_sets,target_reps,exercises(name)))&status=eq.active&workouts.scheduled_date=eq.${today}`),
       pg('/nutrition_targets?select=calories,protein_g,carbs_g,fat_g&order=effective_date.desc&limit=1'),
@@ -58,7 +58,11 @@ async function loadHome(){
       pg('/body_metrics?select=weight_kg&order=recorded_at.desc&limit=1'),
       pg('/messages?select=body,sent_at&order=sent_at.desc&limit=1'),
       pg(`/sessions?select=scheduled_at,status&and=(scheduled_at.gte.${weekAgo}T00:00:00%2B09:00,scheduled_at.lt.${tomorrow}T00:00:00%2B09:00)&order=scheduled_at`),
+      pg(`/messages?select=id&read_at=is.null&sender_id=neq.${uid}`),
+      pg('/notifications?select=id&read_at=is.null&limit=20'),
     ]);
+    setBadge('coach-badge',unreadMsgsRes.length);
+    setBadge('notifications-badge',notifsRes.length);
     memberName=me[0]?.display_name||'';
     // Pick the active plan that actually has a workout scheduled today, not
     // just the first active plan a member happens to have -- a member can

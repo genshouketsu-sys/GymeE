@@ -6,3 +6,4 @@ async function pg(path){const r=await fetch(POSTGREST_URL+path,{headers:{Authori
 function decodeJwtSub(jwt){try{return JSON.parse(atob(jwt.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub}catch{return null}}
 function tokyoDate(offsetDays){const d=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());const[y,m,dd]=d.split('-').map(Number);return new Date(Date.UTC(y,m-1,dd+offsetDays)).toISOString().slice(0,10)}
 function renderIcons(root){root.querySelectorAll('[data-icon]').forEach(el=>el.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true">${paths[el.dataset.icon]||''}</svg>`)}
+function setBadge(id,count){const el=document.getElementById(id);if(!el)return;if(count>0){el.hidden=false;el.textContent=count>9?'9+':String(count)}else{el.hidden=true}}

@@ -3,3 +3,5 @@
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
 i[data-icon]{display:inline-flex;width:17.818px;height:17.818px;flex-shrink:0}
 i svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.badge{position:absolute;top:-2px;right:-2px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--lime);color:#151900;font-size:10.5px;font-weight:700;line-height:17px;text-align:center;box-shadow:0 0 0 2px #1c1c1c;pointer-events:none}
+.badge[hidden]{display:none}

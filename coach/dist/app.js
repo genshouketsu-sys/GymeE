@@ -36,15 +36,17 @@ function renderHome(){
 async function loadHome(){
   try{
     const uid=decodeJwtSub(DEV_JWT),today=tokyoDate(0),tomorrow=tokyoDate(1);
-    const [me,sessionsRes,subsRes,notifsRes,rosterRes]=await Promise.all([
+    const [me,sessionsRes,subsRes,notifsRes,rosterRes,unreadMsgsRes]=await Promise.all([
       pg(`/users?select=display_name&id=eq.${uid}`),
       pg(`/sessions?select=id,member_id,scheduled_at,status,member:users!sessions_member_id_fkey(display_name),workout:workouts(training_plans(name))&and=(scheduled_at.gte.${today}T00:00:00%2B09:00,scheduled_at.lt.${tomorrow}T00:00:00%2B09:00)&order=scheduled_at`),
       pg(`/member_subscriptions?select=member_id,sessions_remaining,membership_plans(session_count)&status=eq.active&order=purchased_at.desc`),
       pg(`/notifications?select=id,type,payload&read_at=is.null&order=created_at.desc&limit=20`),
       pg(`/member_profiles?select=user_id`),
+      pg(`/messages?select=id&read_at=is.null&sender_id=neq.${uid}`),
     ]);
     coachName=me[0]?.display_name||'';
     memberTotal=rosterRes.length;
+    setBadge('messages-badge',unreadMsgsRes.length);
     checkinsPending=sessionsRes.filter(s=>s.status==='checked_in').length;
     const subsByMember={};
     // status=eq.active + purchased_at.desc above means the first row seen per
@@ -58,6 +60,7 @@ async function loadHome(){
       count:subsByMember[s.member_id]||'',
     }));
     alertData=notifsRes.map(n=>({title:n.payload.title,detail:n.payload.detail,type:n.type,short:n.payload.short}));
+    setBadge('notifications-badge',alertData.length);
     renderHome();
   }catch(err){
     console.error('loadHome failed',err);
