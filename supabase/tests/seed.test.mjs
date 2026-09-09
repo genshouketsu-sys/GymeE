@@ -16,7 +16,9 @@ const seedPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '
 
 const main = async () => {
   const { db } = await freshDb();
-  await db.exec(fs.readFileSync(seedPath, 'utf8'));
+  const seedSql = fs.readFileSync(seedPath, 'utf8');
+  await db.exec(seedSql);
+  await db.exec(seedSql); // re-run once more: every row must be idempotent, not duplicated
 
   const results = [];
   const check = (label, actual, expected) => {
@@ -77,6 +79,20 @@ const main = async () => {
   // cross-check RLS still holds with real seed data: 佐藤 must not see 田中's nutrition target.
   const crossCheck = await asUser(db, SATO, `select 1 from public.nutrition_targets where member_id = '${TANAKA}'`);
   check("seed data still respects RLS: 佐藤 cannot read 田中's nutrition target", crossCheck, []);
+
+  // direct idempotency check on the tables that used to lack a stable id
+  // (member_subscriptions, notifications, meal_logs, body_metrics,
+  // workout_exercises, messages) -- seedSql already ran twice above.
+  const counts = await asUser(db, KENTA, `
+    select
+      (select count(*)::int from public.member_subscriptions) as subs,
+      (select count(*)::int from public.notifications) as notifs,
+      (select count(*)::int from public.meal_logs) as meals,
+      (select count(*)::int from public.body_metrics) as metrics,
+      (select count(*)::int from public.workout_exercises) as we,
+      (select count(*)::int from public.messages) as msgs
+  `);
+  check('re-running seed.sql does not duplicate rows', counts, [{ subs: 3, notifs: 3, meals: 1, metrics: 1, we: 3, msgs: 1 }]);
 
   const passCount = results.filter(Boolean).length;
   console.log(`\n${passCount}/${results.length} seed-data checks passed.`);
