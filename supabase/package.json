@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "npm run test:schema && npm run test:rls",
+    "test": "npm run test:schema && npm run test:rls && npm run test:seed",
     "test:schema": "node tests/schema.test.mjs",
-    "test:rls": "node tests/rls.test.mjs"
+    "test:rls": "node tests/rls.test.mjs",
+    "test:seed": "node tests/seed.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8"
