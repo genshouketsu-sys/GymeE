@@ -7,4 +7,21 @@
 <section><div class="section-heading"><h2>フォローが必要な会員</h2><button data-action="notifications">すべて見る <i data-icon="chevron"></i></button></div><div class="card alerts" id="alerts-list"><button data-alert="0"><span class="alert-icon red"><i data-icon="trend"></i></span><span><strong>ベンチプレスの記録が低下</strong><small>直近3回のセッションで記録が低下</small></span><i data-icon="chevron"></i></button><button data-alert="1"><span class="alert-icon amber"><i data-icon="note"></i></span><span><strong>食事の記録が未提出</strong><small>7日間、食事の投稿がありません</small></span><i data-icon="chevron"></i></button><button data-alert="2"><span class="alert-icon blue"><i data-icon="users"></i></span><span><strong>パーソナルトレーニング残り3回</strong><small>継続プランのご案内がおすすめです</small></span><i data-icon="chevron"></i></button></div></section>
 <section class="quick"><div class="flourish"></div><div class="motto">もっと強く<br>もっと自分らしく<br>もっと輝く毎日へ</div><div class="section-heading"><h2>クイックアクション</h2></div><div class="actions"><button class="start" data-action="start"><i data-icon="play"></i><span>セッション<br>開始</span></button><button data-action="checkins"><i data-icon="check"></i><span>チェックイン<br>確認</span></button><button data-action="notes"><i data-icon="note"></i><span>会員<br>メモ</span></button><button data-action="renewals"><i data-icon="renew"></i><span>プラン更新</span></button></div></section></main>
 <nav aria-label="メインナビゲーション"><button class="active" data-action="home"><i data-icon="home"></i><span>ホーム</span></button><button data-action="members"><i data-icon="users"></i><span>会員</span></button><button data-action="sessions"><i data-icon="calendar"></i><span>セッション</span></button><button data-action="messages"><i data-icon="message"></i><span>メッセージ</span></button><button data-action="profile"><i data-icon="user"></i><span>プロフィール</span></button></nav>
-<dialog id="panel"><div class="dialog-head"><h2 id="panel-title"></h2><button id="close" aria-label="閉じる">×</button></div><div id="panel-body"></div></dialog><div id="toast" role="status"></div></div></div><script src="shared.js?v=responsive-20260908"></script><script src="app.js?v=responsive-20260908"></script></body></html>
+<dialog id="panel"><div class="dialog-head"><h2 id="panel-title"></h2><button id="close" aria-label="閉じる">×</button></div><div id="panel-body"></div></dialog><div id="toast" role="status"></div></div></div>
+<dialog id="chat">
+  <div class="chat-head">
+    <button id="chat-back" class="chat-back" aria-label="会員一覧に戻る" hidden><i data-icon="chevronLeft"></i></button>
+    <span class="chat-avatar" id="chat-avatar" hidden></span>
+    <div class="chat-head-text"><strong id="chat-title"></strong><small id="chat-subtitle" hidden></small></div>
+    <button id="chat-close" class="chat-close" aria-label="閉じる">×</button>
+  </div>
+  <div class="chat-list" id="chat-list" hidden></div>
+  <div class="chat-thread" id="chat-thread" hidden>
+    <div class="chat-messages" id="chat-messages"></div>
+    <form class="chat-input" id="chat-form">
+      <textarea id="chat-text" rows="1" placeholder="メッセージを入力" maxlength="2000"></textarea>
+      <button type="submit" class="chat-send" id="chat-send" aria-label="送信"><i data-icon="send"></i></button>
+    </form>
+  </div>
+</dialog>
+<script src="shared.js?v=responsive-20260908"></script><script src="app.js?v=responsive-20260908"></script></body></html>
