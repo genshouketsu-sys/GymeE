@@ -98,6 +98,24 @@ async function loadHome(){
   }
 }
 loadHome();
+// Same gap as the coach app: badges only reflected page-load state, so a
+// coach reply sent while this page just sat here never showed up until a
+// manual reload. Poll just the two counts, not the whole home screen.
+async function refreshBadges(){
+  // Deliberately no document.hidden skip -- see coach/dist/app.js for why:
+  // a badge exists to reflect activity from while the tab was backgrounded,
+  // so it has to keep polling then, not stop.
+  try{
+    const uid=decodeJwtSub(DEV_JWT);
+    const [unreadMsgsRes,notifsRes]=await Promise.all([
+      pg(`/messages?select=id&read_at=is.null&sender_id=neq.${uid}`),
+      pg('/notifications?select=id&read_at=is.null&limit=20'),
+    ]);
+    setBadge('coach-badge',unreadMsgsRes.length);
+    setBadge('notifications-badge',notifsRes.length);
+  }catch(err){console.error('refreshBadges failed',err)}
+}
+setInterval(refreshBadges,5000);
 
 /* -- Chat with the member's one coach (shared thread logic is in shared.js). -- */
 chatOnRead=()=>setBadge('coach-badge',0);

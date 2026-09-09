@@ -69,6 +69,30 @@ async function loadHome(){
   }
 }
 loadHome();
+// The badges only reflected whatever was true at page-load: sit on the home
+// screen and a new message/notification arrives, and the icon stays wrong
+// until a manual reload -- the chat thread already polls while open, the
+// home screen never did. Poll just the two counts (cheap, 2 small queries)
+// rather than the whole home screen, so this can't fight with in-progress
+// interaction on the sessions/alerts lists.
+async function refreshBadges(){
+  // Deliberately no document.hidden skip: the whole point of a badge is to
+  // reflect activity that happened while this tab wasn't the focused one,
+  // so it has to keep polling in the background to be correct the moment
+  // you switch back -- confirmed by testing with the coach tab backgrounded
+  // while a message arrived, which an earlier `if(document.hidden)return`
+  // here silently and incorrectly suppressed.
+  try{
+    const uid=decodeJwtSub(DEV_JWT);
+    const [unreadMsgsRes,notifsRes]=await Promise.all([
+      pg(`/messages?select=id&read_at=is.null&sender_id=neq.${uid}`),
+      pg('/notifications?select=id&read_at=is.null&limit=20'),
+    ]);
+    setBadge('messages-badge',unreadMsgsRes.length);
+    setBadge('notifications-badge',notifsRes.length);
+  }catch(err){console.error('refreshBadges failed',err)}
+}
+setInterval(refreshBadges,5000);
 
 /* -- Chat: list of the coach's members -> thread with one of them.
    Thread-level behavior (load/send/poll/mark-read) is shared.js; this is
