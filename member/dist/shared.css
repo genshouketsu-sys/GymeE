@@ -1,0 +1,5 @@
+/* Shared between coach/dist and member/dist — keep both copies byte-identical. */
+*{box-sizing:border-box}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+i[data-icon]{display:inline-flex;width:17.818px;height:17.818px;flex-shrink:0}
+i svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
