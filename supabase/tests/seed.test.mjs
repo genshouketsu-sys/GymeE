@@ -82,7 +82,7 @@ const main = async () => {
 
   // direct idempotency check on the tables that used to lack a stable id
   // (member_subscriptions, notifications, meal_logs, body_metrics,
-  // workout_exercises, messages) -- seedSql already ran twice above.
+  // workout_exercises, messages, sessions) -- seedSql already ran twice above.
   const counts = await asUser(db, KENTA, `
     select
       (select count(*)::int from public.member_subscriptions) as subs,
@@ -90,9 +90,29 @@ const main = async () => {
       (select count(*)::int from public.meal_logs) as meals,
       (select count(*)::int from public.body_metrics) as metrics,
       (select count(*)::int from public.workout_exercises) as we,
-      (select count(*)::int from public.messages) as msgs
+      (select count(*)::int from public.messages) as msgs,
+      (select count(*)::int from public.sessions) as sessions
   `);
-  check('re-running seed.sql does not duplicate rows', counts, [{ subs: 3, notifs: 3, meals: 1, metrics: 1, we: 3, msgs: 1 }]);
+  check('re-running seed.sql does not duplicate rows', counts, [{ subs: 3, notifs: 3, meals: 1, metrics: 1, we: 3, msgs: 1, sessions: 8 }]);
+
+  // the numbers member/dist's "今週" card (streak + workout count) derives at
+  // runtime from session history -- assert the underlying rows are right, not
+  // just that seed.sql "has some sessions".
+  const weekSessions = await asUser(
+    db, TANAKA,
+    `select scheduled_at::date::text as d, status from public.sessions
+     where member_id = '${TANAKA}'
+       and scheduled_at >= (now() at time zone 'Asia/Tokyo')::date - interval '6 day'
+       and scheduled_at < (now() at time zone 'Asia/Tokyo')::date + interval '1 day'
+     order by scheduled_at`
+  );
+  check('5 of the last 6 days are completed, today is still scheduled (backs weeklyDone/weeklyTotal/streak)',
+    { total: weekSessions.length, completed: weekSessions.filter(s => s.status === 'completed').length },
+    { total: 6, completed: 5 });
+
+  // member/dist's plan-meta duration text
+  const duration = await asUser(db, TANAKA, `select duration_min from public.workouts where id = '33333333-3333-3333-3333-333333333311'`);
+  check("田中's workout has the seeded 52-minute duration", duration, [{ duration_min: 52 }]);
 
   const passCount = results.filter(Boolean).length;
   console.log(`\n${passCount}/${results.length} seed-data checks passed.`);

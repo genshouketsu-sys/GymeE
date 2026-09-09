@@ -56,13 +56,19 @@ insert into public.exercises (id, name, muscle_group) values
 on conflict (id) do nothing;
 
 -- 田中健's plan: "胸 ＋ 上腕三頭筋", 52分 / 7種目 (member app home screen)
+--
+-- "today" is computed as (now() at time zone 'Asia/Tokyo')::date everywhere
+-- in this file rather than current_date (the session/server timezone,
+-- UTC unless configured otherwise, and never overridden by any migration
+-- here) -- with current_date, seeded "today" rows fall out of the app's
+-- Asia/Tokyo query window for 9 hours every day (UTC 15:00-23:59).
 insert into public.training_plans (id, member_id, coach_id, name, status) values
   ('33333333-3333-3333-3333-333333333301', '11111111-1111-1111-1111-111111111111', '11111111-1111-1111-1111-111111111101', '胸 ＋ 上腕三頭筋', 'active')
 on conflict (id) do nothing;
 
-insert into public.workouts (id, plan_id, name, scheduled_date, order_index) values
-  ('33333333-3333-3333-3333-333333333311', '33333333-3333-3333-3333-333333333301', '胸 ＋ 上腕三頭筋', current_date, 0)
-on conflict (id) do update set scheduled_date = excluded.scheduled_date;
+insert into public.workouts (id, plan_id, name, scheduled_date, order_index, duration_min) values
+  ('33333333-3333-3333-3333-333333333311', '33333333-3333-3333-3333-333333333301', '胸 ＋ 上腕三頭筋', (now() at time zone 'Asia/Tokyo')::date, 0, 52)
+on conflict (id) do update set scheduled_date = excluded.scheduled_date, duration_min = excluded.duration_min;
 
 -- 佐藤由紀・王明 の today's focus text (coach home's "今日のセッション" list) --
 -- no exercise breakdown seeded for these two, only the plan name coach/dist shows.
@@ -72,8 +78,8 @@ insert into public.training_plans (id, member_id, coach_id, name, status) values
 on conflict (id) do nothing;
 
 insert into public.workouts (id, plan_id, name, scheduled_date, order_index) values
-  ('33333333-3333-3333-3333-333333333312', '33333333-3333-3333-3333-333333333302', 'お尻・脚', current_date, 0),
-  ('33333333-3333-3333-3333-333333333313', '33333333-3333-3333-3333-333333333303', '脂肪燃焼', current_date, 0)
+  ('33333333-3333-3333-3333-333333333312', '33333333-3333-3333-3333-333333333302', 'お尻・脚', (now() at time zone 'Asia/Tokyo')::date, 0),
+  ('33333333-3333-3333-3333-333333333313', '33333333-3333-3333-3333-333333333303', '脂肪燃焼', (now() at time zone 'Asia/Tokyo')::date, 0)
 on conflict (id) do update set scheduled_date = excluded.scheduled_date;
 
 insert into public.workout_exercises (id, workout_id, exercise_id, order_index, target_sets, target_reps) values
@@ -84,9 +90,9 @@ on conflict (id) do nothing;
 
 -- coach's "今日のセッション": 10:00 田中健, 11:30 佐藤由紀, 15:00 王明, all 60分
 insert into public.sessions (id, coach_id, member_id, workout_id, scheduled_at, duration_min, status) values
-  ('44444444-4444-4444-4444-444444444401', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333311', current_date + time '10:00', 60, 'scheduled'),
-  ('44444444-4444-4444-4444-444444444402', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111112', '33333333-3333-3333-3333-333333333312', current_date + time '11:30', 60, 'scheduled'),
-  ('44444444-4444-4444-4444-444444444403', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111113', '33333333-3333-3333-3333-333333333313', current_date + time '15:00', 60, 'scheduled')
+  ('44444444-4444-4444-4444-444444444401', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333311', (((now() at time zone 'Asia/Tokyo')::date + time '10:00') at time zone 'Asia/Tokyo'), 60, 'scheduled'),
+  ('44444444-4444-4444-4444-444444444402', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111112', '33333333-3333-3333-3333-333333333312', (((now() at time zone 'Asia/Tokyo')::date + time '11:30') at time zone 'Asia/Tokyo'), 60, 'scheduled'),
+  ('44444444-4444-4444-4444-444444444403', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111113', '33333333-3333-3333-3333-333333333313', (((now() at time zone 'Asia/Tokyo')::date + time '15:00') at time zone 'Asia/Tokyo'), 60, 'scheduled')
 on conflict (id) do update set
   workout_id = excluded.workout_id, scheduled_at = excluded.scheduled_at;
 
@@ -94,11 +100,11 @@ on conflict (id) do update set
 -- (workout count + streak) with a real, computable history instead of a
 -- hand-typed "4 / 5" / "6日" that no query actually produces.
 insert into public.sessions (id, coach_id, member_id, scheduled_at, duration_min, status) values
-  ('44444444-4444-4444-4444-444444444411', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', current_date - interval '1 day' + time '10:00', 60, 'completed'),
-  ('44444444-4444-4444-4444-444444444412', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', current_date - interval '2 day' + time '10:00', 60, 'completed'),
-  ('44444444-4444-4444-4444-444444444413', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', current_date - interval '3 day' + time '10:00', 60, 'completed'),
-  ('44444444-4444-4444-4444-444444444414', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', current_date - interval '4 day' + time '10:00', 60, 'completed'),
-  ('44444444-4444-4444-4444-444444444415', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', current_date - interval '5 day' + time '10:00', 60, 'completed')
+  ('44444444-4444-4444-4444-444444444411', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', (((now() at time zone 'Asia/Tokyo')::date - interval '1 day' + time '10:00') at time zone 'Asia/Tokyo'), 60, 'completed'),
+  ('44444444-4444-4444-4444-444444444412', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', (((now() at time zone 'Asia/Tokyo')::date - interval '2 day' + time '10:00') at time zone 'Asia/Tokyo'), 60, 'completed'),
+  ('44444444-4444-4444-4444-444444444413', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', (((now() at time zone 'Asia/Tokyo')::date - interval '3 day' + time '10:00') at time zone 'Asia/Tokyo'), 60, 'completed'),
+  ('44444444-4444-4444-4444-444444444414', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', (((now() at time zone 'Asia/Tokyo')::date - interval '4 day' + time '10:00') at time zone 'Asia/Tokyo'), 60, 'completed'),
+  ('44444444-4444-4444-4444-444444444415', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', (((now() at time zone 'Asia/Tokyo')::date - interval '5 day' + time '10:00') at time zone 'Asia/Tokyo'), 60, 'completed')
 on conflict (id) do update set scheduled_at = excluded.scheduled_at, status = excluded.status;
 
 -- "18 / 24回", "6 / 16回", "11 / 24回" next to each member -- their current PT package.
