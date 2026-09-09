@@ -96,6 +96,12 @@ const main = async () => {
   const ownMetricAsMember = await asUser(db, TANAKA, `select weight_kg from public.body_metrics where member_id = '${TANAKA}'`);
   check('member 田中 can read his OWN body metrics', ownMetricAsMember, [{ weight_kg: '72.4' }]);
 
+  const coachViaMember = await asUser(db, TANAKA, `select display_name from public.users where id = '${KENTA}'`);
+  check("member 田中 can read his own coach's display_name (needed to show the coach's name in the chat header)", coachViaMember, [{ display_name: '健太' }]);
+
+  const otherCoachViaMember = await asUser(db, TANAKA, `select display_name from public.users where id = '${OTHER_COACH}'`);
+  check("member 田中 cannot read a coach who isn't his own", otherCoachViaMember, []);
+
   // Regression test for a real bug: the "mark read" UPDATE policy's
   // `with check (sender_id = messages.sender_id)` was a tautology (both
   // sides resolve to the NEW row under RLS), so a participant "marking a
