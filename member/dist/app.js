@@ -6,10 +6,79 @@ document.querySelector('.week-stats [data-icon="flame"] svg')?.setAttribute('vie
 // Layout is responsive CSS; no viewport scaling is applied.
 
 const panel=document.getElementById('panel'),title=document.getElementById('panel-title'),body=document.getElementById('panel-body');let sessionActive=false,photoURL;
+const POSTGREST_URL='http://127.0.0.1:3001';
+// DEV ONLY: fixed token for member 田中健 (ケン), minted against the local dev
+// Postgres under supabase/ (see supabase/README.md). Real login (Supabase
+// Auth) isn't wired up yet -- swap this for the signed-in user's session token.
+const DEV_JWT='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYXV0aGVudGljYXRlZCIsInN1YiI6IjExMTExMTExLTExMTEtMTExMS0xMTExLTExMTExMTExMTExMSIsImV4cCI6MTgyMDQ1NzY2N30.RBVc8xO4CTLVsB6M7y99N_taX3n07qJPiOSovCtd8yg';
+async function pg(path){const r=await fetch(POSTGREST_URL+path,{headers:{Authorization:'Bearer '+DEV_JWT}});if(!r.ok)throw new Error('API '+r.status+': '+path);return r.json()}
+function decodeJwtSub(jwt){try{return JSON.parse(atob(jwt.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).sub}catch{return null}}
+function tokyoDate(offsetDays){const d=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());const[y,m,dd]=d.split('-').map(Number);return new Date(Date.UTC(y,m-1,dd+offsetDays)).toISOString().slice(0,10)}
 function show(t,html){title.textContent=t;body.innerHTML=html;if(!panel.open)panel.showModal()}
-const exercises=[['ベンチプレス','4 × 8回'],['インクラインダンベルプレス','3 × 10回'],['ケーブルフライ','3 × 12回']];
+let exercises=[],memberName='',planName='',nutritionTarget={calories:0,protein_g:0,carbs_g:0,fat_g:0},nutritionActual={calories:0,protein_g:0,carbs_g:0,fat_g:0},memoText='',weight=null,weeklyDone=0,weeklyTotal=0,streak=0;
 function details(a,b){return `<div class="detail">${esc(a)}<small>${esc(b)}</small></div>`}
-function training(){show('今日のトレーニング',details('胸 ＋ 上腕三頭筋','52分 · 7種目')+exercises.map((e,i)=>`<button class="detail" style="width:100%;text-align:left" data-exercise="${i}">${esc(e[0])}<small>${esc(e[1])}</small></button>`).join('')+'<button class="primary" data-action="start">ワークアウトを開始</button>')}
-const actions={home:()=>panel.close(),training,start:()=>{if(sessionActive){show('ワークアウト中',details('胸 ＋ 上腕三頭筋','最後のセットまで丁寧に。')+'<button class="primary" id="finish">ワークアウトを終了</button>');document.getElementById('finish').onclick=()=>{sessionActive=false;show('ワークアウト終了','<p>お疲れさまでした。</p>')}}else{sessionActive=true;actions.start()}},nutrition:()=>show('栄養管理',details('カロリー','1,420 / 2,200 kcal')+details('たんぱく質','108 / 160 g')+details('炭水化物','172 / 260 g')+details('脂質','43 / 65 g')+'<button class="primary" data-action="food">食事を記録</button>'),progress:()=>show('今週の進捗',details('ワークアウト','4 / 5回')+details('体重','72.4 kg')+details('連続記録','6日')+'<button class="primary" data-action="photo">経過写真を選ぶ</button>'),coach:()=>show('コーチメモ','<p>昨日のベンチは好調でした。<br>今日は最後のセットを丁寧に。</p><div class="detail"><label for="draft">相談メモ</label><textarea id="draft" placeholder="コーチに相談したいことをメモ"></textarea><button class="primary" id="save-draft">この端末に下書きを保存</button></div><p>送信にはコーチとの接続が必要です。</p>'),notifications:()=>show('通知',details('コーチメモ','昨日のベンチは好調でした。今日は最後のセットを丁寧に。')),food:()=>{show('食事記録','<label for="meal">今日の食事</label><textarea id="meal" placeholder="食べたもの・量を入力"></textarea><button class="primary" id="save-food">この端末に保存</button>');try{document.getElementById('meal').value=localStorage.getItem('gyme-member-meal')||''}catch{}document.getElementById('save-food').onclick=()=>{try{localStorage.setItem('gyme-member-meal',document.getElementById('meal').value);show('保存しました','<p>食事メモをこの端末に保存しました。</p>')}catch{show('保存できませんでした','<p>ブラウザの保存設定をご確認ください。</p>')}}},photo:()=>{show('経過写真','<label for="photo">写真を選んで確認</label><input id="photo" type="file" accept="image/*"><img id="photo-preview" alt="選択した経過写真" hidden><p>選んだ写真はこの画面でのみ表示されます。</p>');document.getElementById('photo').onchange=e=>{const file=e.target.files[0];if(!file)return;if(photoURL)URL.revokeObjectURL(photoURL);photoURL=URL.createObjectURL(file);const image=document.getElementById('photo-preview');image.src=photoURL;image.hidden=false}}};
+function training(){show('今日のトレーニング',details(planName,exercises.length+'種目')+exercises.map((e,i)=>`<button class="detail" style="width:100%;text-align:left" data-exercise="${i}">${esc(e[0])}<small>${esc(e[1])}</small></button>`).join('')+'<button class="primary" data-action="start">ワークアウトを開始</button>')}
+const actions={home:()=>panel.close(),training,start:()=>{if(sessionActive){show('ワークアウト中',details(planName,'最後のセットまで丁寧に。')+'<button class="primary" id="finish">ワークアウトを終了</button>');document.getElementById('finish').onclick=()=>{sessionActive=false;show('ワークアウト終了','<p>お疲れさまでした。</p>')}}else{sessionActive=true;actions.start()}},nutrition:()=>show('栄養管理',details('カロリー',`${nutritionActual.calories} / ${nutritionTarget.calories} kcal`)+details('たんぱく質',`${nutritionActual.protein_g} / ${nutritionTarget.protein_g} g`)+details('炭水化物',`${nutritionActual.carbs_g} / ${nutritionTarget.carbs_g} g`)+details('脂質',`${nutritionActual.fat_g} / ${nutritionTarget.fat_g} g`)+'<button class="primary" data-action="food">食事を記録</button>'),progress:()=>show('今週の進捗',details('ワークアウト',`${weeklyDone} / ${weeklyTotal}回`)+details('体重',weight!=null?`${weight} kg`:'記録なし')+details('連続記録',streak+'日')+'<button class="primary" data-action="photo">経過写真を選ぶ</button>'),coach:()=>show('コーチメモ',`<p>${esc(memoText).replace(/\n/g,'<br>')}</p><div class="detail"><label for="draft">相談メモ</label><textarea id="draft" placeholder="コーチに相談したいことをメモ"></textarea><button class="primary" id="save-draft">この端末に下書きを保存</button></div><p>送信にはコーチとの接続が必要です。</p>`),notifications:()=>show('通知',details('コーチメモ',memoText)),food:()=>{show('食事記録','<label for="meal">今日の食事</label><textarea id="meal" placeholder="食べたもの・量を入力"></textarea><button class="primary" id="save-food">この端末に保存</button>');try{document.getElementById('meal').value=localStorage.getItem('gyme-member-meal')||''}catch{}document.getElementById('save-food').onclick=()=>{try{localStorage.setItem('gyme-member-meal',document.getElementById('meal').value);show('保存しました','<p>食事メモをこの端末に保存しました。</p>')}catch{show('保存できませんでした','<p>ブラウザの保存設定をご確認ください。</p>')}}},photo:()=>{show('経過写真','<label for="photo">写真を選んで確認</label><input id="photo" type="file" accept="image/*"><img id="photo-preview" alt="選択した経過写真" hidden><p>選んだ写真はこの画面でのみ表示されます。</p>');document.getElementById('photo').onchange=e=>{const file=e.target.files[0];if(!file)return;if(photoURL)URL.revokeObjectURL(photoURL);photoURL=URL.createObjectURL(file);const image=document.getElementById('photo-preview');image.src=photoURL;image.hidden=false}}};
 document.getElementById('close').onclick=()=>panel.close();
 document.addEventListener('click',event=>{const a=event.target.closest('[data-action]'),e=event.target.closest('[data-exercise]');if(a){actions[a.dataset.action]?.();if(a.dataset.action==='coach'){try{document.getElementById('draft').value=localStorage.getItem('gyme-member-draft')||''}catch{}document.getElementById('save-draft').onclick=()=>{try{localStorage.setItem('gyme-member-draft',document.getElementById('draft').value);show('下書きを保存しました','<p>相談メモをこの端末に保存しました。</p>')}catch{show('保存できませんでした','<p>ブラウザの保存設定をご確認ください。</p>')}}}}if(e){const x=exercises[Number(e.dataset.exercise)];show(x[0],details('今日のセット',x[1])+'<p>今日は最後のセットを丁寧に。</p><button class="primary" data-action="start">ワークアウトを開始</button>')}});
+
+function renderIcons(root){root.querySelectorAll('[data-icon]').forEach(el=>el.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true">${paths[el.dataset.icon]||''}</svg>`)}
+function pct(actual,target){return target?Math.round(Math.min(actual/target,1)*100):0}
+function renderHome(){
+  document.getElementById('greeting').textContent=`おはよう、${memberName}`;
+  document.getElementById('plan-name').textContent=planName;
+  document.getElementById('plan-meta').innerHTML=`<span><i data-icon="bars"></i>${exercises.length}種目</span>`;
+  renderIcons(document.getElementById('plan-meta'));
+  const list=document.getElementById('exercise-list');
+  list.innerHTML=exercises.map((ex,i)=>`<button data-exercise="${i}"><span class="exercise-photo"></span><span><strong>${esc(ex[0])}</strong><small>${esc(ex[1])}</small></span><i data-icon="chevron"></i></button>`).join('');
+  renderIcons(list);
+  const rings=[['lime','flame','calories'],['blue','protein','protein_g'],['yellow','wheat','carbs_g'],['purple','drop','fat_g']];
+  const unitless=new Set(['calories']);
+  const nutrients=document.getElementById('nutrients');
+  nutrients.innerHTML=rings.map(([color,icon,key])=>`<button data-action="nutrition"><span class="ring ${color}" style="--progress:${pct(nutritionActual[key],nutritionTarget[key])}%"><i data-icon="${icon}"></i></span><span><b>${nutritionActual[key]}</b> / ${nutritionTarget[key]}${unitless.has(key)?'':'g'}</span><small>${key==='calories'?'カロリー':key==='protein_g'?'たんぱく質':key==='carbs_g'?'炭水化物':'脂質'}</small></button>`).join('');
+  renderIcons(nutrients);
+  document.getElementById('memo-text').textContent=memoText;
+  const weekStats=document.getElementById('week-stats');
+  weekStats.innerHTML=`<button data-action="progress"><i data-icon="dumbbell"></i><span><b>${weeklyDone} / ${weeklyTotal}</b><small>ワークアウト</small></span></button><button data-action="progress"><i data-icon="trend"></i><span><b>${weight!=null?weight+' kg':'—'}</b><small>体重</small></span></button><button data-action="progress"><i data-icon="flame"></i><span><b>${streak}日</b><small>連続記録</small></span></button>`;
+  renderIcons(weekStats);
+  document.querySelector('#week-stats [data-icon="flame"] svg')?.setAttribute('viewBox','-1 -1 26 26');
+}
+async function loadHome(){
+  try{
+    const uid=decodeJwtSub(DEV_JWT),today=tokyoDate(0),weekAgo=tokyoDate(-6),tomorrow=tokyoDate(1);
+    const [me,plansRes,targetRes,mealsRes,metricRes,msgRes,weekSessionsRes]=await Promise.all([
+      pg(`/users?select=display_name&id=eq.${uid}`),
+      pg(`/training_plans?select=name,workouts(id,scheduled_date,workout_exercises(order_index,target_sets,target_reps,exercises(name)))&status=eq.active&workouts.scheduled_date=eq.${today}`),
+      pg('/nutrition_targets?select=calories,protein_g,carbs_g,fat_g&order=effective_date.desc&limit=1'),
+      pg(`/meal_logs?select=calories,protein_g,carbs_g,fat_g&logged_at=gte.${today}T00:00:00%2B09:00&logged_at=lt.${tomorrow}T00:00:00%2B09:00`),
+      pg('/body_metrics?select=weight_kg&order=recorded_at.desc&limit=1'),
+      pg('/messages?select=body,sent_at&order=sent_at.desc&limit=1'),
+      pg(`/sessions?select=scheduled_at,status&and=(scheduled_at.gte.${weekAgo}T00:00:00%2B09:00,scheduled_at.lt.${tomorrow}T00:00:00%2B09:00)&order=scheduled_at`),
+    ]);
+    memberName=me[0]?.display_name||'';
+    const plan=plansRes[0];
+    planName=plan?.name||'';
+    const todaysWorkout=plan?.workouts?.[0];
+    exercises=(todaysWorkout?.workout_exercises||[]).sort((a,b)=>a.order_index-b.order_index).map(we=>[we.exercises?.name||'',`${we.target_sets} × ${we.target_reps}回`]);
+    nutritionTarget=targetRes[0]||nutritionTarget;
+    nutritionActual={
+      calories:mealsRes.reduce((s,m)=>s+(m.calories||0),0),
+      protein_g:mealsRes.reduce((s,m)=>s+(m.protein_g||0),0),
+      carbs_g:mealsRes.reduce((s,m)=>s+(m.carbs_g||0),0),
+      fat_g:mealsRes.reduce((s,m)=>s+(m.fat_g||0),0),
+    };
+    weight=metricRes[0]?.weight_kg??null;
+    memoText=msgRes[0]?.body||'';
+    weeklyTotal=weekSessionsRes.length;
+    weeklyDone=weekSessionsRes.filter(s=>s.status==='completed').length;
+    const completedDates=new Set(weekSessionsRes.filter(s=>s.status==='completed').map(s=>s.scheduled_at.slice(0,10)));
+    let streakCount=0,offset=completedDates.has(tokyoDate(0))?0:-1;
+    while(completedDates.has(tokyoDate(offset))){streakCount++;offset--}
+    streak=streakCount;
+    renderHome();
+  }catch(err){
+    console.error('loadHome failed',err);
+    document.getElementById('greeting').textContent='データを読み込めませんでした';
+  }
+}
+loadHome();

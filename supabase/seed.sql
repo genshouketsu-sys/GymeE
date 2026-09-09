@@ -90,6 +90,17 @@ insert into public.sessions (id, coach_id, member_id, workout_id, scheduled_at, 
 on conflict (id) do update set
   workout_id = excluded.workout_id, scheduled_at = excluded.scheduled_at;
 
+-- 田中's past 5 days, all completed -- backs member/dist's "今週" card
+-- (workout count + streak) with a real, computable history instead of a
+-- hand-typed "4 / 5" / "6日" that no query actually produces.
+insert into public.sessions (id, coach_id, member_id, scheduled_at, duration_min, status) values
+  ('44444444-4444-4444-4444-444444444411', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', current_date - interval '1 day' + time '10:00', 60, 'completed'),
+  ('44444444-4444-4444-4444-444444444412', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', current_date - interval '2 day' + time '10:00', 60, 'completed'),
+  ('44444444-4444-4444-4444-444444444413', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', current_date - interval '3 day' + time '10:00', 60, 'completed'),
+  ('44444444-4444-4444-4444-444444444414', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', current_date - interval '4 day' + time '10:00', 60, 'completed'),
+  ('44444444-4444-4444-4444-444444444415', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111', current_date - interval '5 day' + time '10:00', 60, 'completed')
+on conflict (id) do update set scheduled_at = excluded.scheduled_at, status = excluded.status;
+
 -- "18 / 24回", "6 / 16回", "11 / 24回" next to each member -- their current PT package.
 insert into public.membership_plans (id, org_id, name, session_count, price_cents) values
   ('55555555-5555-5555-5555-555555555501', '11111111-1111-1111-1111-111111111100', 'PT 24回パッケージ', 24, 240000),
@@ -118,10 +129,10 @@ on conflict (id) do update set recorded_at = excluded.recorded_at;
 
 -- coach's "フォローが必要な会員" alerts
 insert into public.notifications (id, user_id, type, payload) values
-  ('cccccccc-cccc-cccc-cccc-ccccccccccc1', '11111111-1111-1111-1111-111111111101', 'declining_trend', '{"title":"ベンチプレスの記録が低下","detail":"直近3回のセッションで記録が低下しています。次回のセッションでフォーム、疲労感、負荷設定を確認しましょう。","member_id":"11111111-1111-1111-1111-111111111111"}'),
-  ('cccccccc-cccc-cccc-cccc-ccccccccccc2', '11111111-1111-1111-1111-111111111101', 'missing_meal_logs', '{"title":"食事の記録が未提出","detail":"7日間、食事の投稿がありません。次回の面談時に、食事記録の状況を確認しましょう。","member_id":"11111111-1111-1111-1111-111111111112"}'),
-  ('cccccccc-cccc-cccc-cccc-ccccccccccc3', '11111111-1111-1111-1111-111111111101', 'renewal_due', '{"title":"パーソナルトレーニング残り3回","detail":"継続の目標とご希望を確認して、次のプランをご案内しましょう。","member_id":"11111111-1111-1111-1111-111111111113"}')
-on conflict (id) do nothing;
+  ('cccccccc-cccc-cccc-cccc-ccccccccccc1', '11111111-1111-1111-1111-111111111101', 'declining_trend', '{"title":"ベンチプレスの記録が低下","short":"直近3回のセッションで記録が低下","detail":"直近3回のセッションで記録が低下しています。次回のセッションでフォーム、疲労感、負荷設定を確認しましょう。","member_id":"11111111-1111-1111-1111-111111111111"}'),
+  ('cccccccc-cccc-cccc-cccc-ccccccccccc2', '11111111-1111-1111-1111-111111111101', 'missing_meal_logs', '{"title":"食事の記録が未提出","short":"7日間、食事の投稿がありません","detail":"7日間、食事の投稿がありません。次回の面談時に、食事記録の状況を確認しましょう。","member_id":"11111111-1111-1111-1111-111111111112"}'),
+  ('cccccccc-cccc-cccc-cccc-ccccccccccc3', '11111111-1111-1111-1111-111111111101', 'renewal_due', '{"title":"パーソナルトレーニング残り3回","short":"継続プランのご案内がおすすめです","detail":"継続の目標とご希望を確認して、次のプランをご案内しましょう。","member_id":"11111111-1111-1111-1111-111111111113"}')
+on conflict (id) do update set payload = excluded.payload;
 
 -- member home "コーチメモ" / coach's memo feature
 insert into public.conversations (id, coach_id, member_id) values
