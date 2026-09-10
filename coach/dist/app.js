@@ -14,12 +14,36 @@ document.getElementById('alerts-list').innerHTML='';
 // under supabase/ (see supabase/README.md). Real login (Supabase Auth) isn't
 // wired up yet -- swap this for the signed-in user's real session token.
 const DEV_JWT='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYXV0aGVudGljYXRlZCIsInN1YiI6IjExMTExMTExLTExMTEtMTExMS0xMTExLTExMTExMTExMTEwMSIsImV4cCI6MTgyMDQ1NzY2N30.Cc4g0Irrtqrh8U6mQS8piSiqx-GcWU_uNaunpv_2XpU';
-let members=[],alertData=[],checkinsPending=0,memberTotal=0,coachName='';
+let members=[],alertData=[],checkinsPending=0,memberTotal=0,coachName='',notifItems=[];
 const alertStyle={declining_trend:['red','trend'],missing_meal_logs:['amber','note'],renewal_due:['blue','users']};
 function show(t,html){title.textContent=t;body.innerHTML=html;if(!panel.open)panel.showModal();}function row(a,b){return `<div class="detail-row">${esc(a)}<small>${esc(b)}</small></div>`}function notify(t){panel.close();const el=document.getElementById('toast');el.textContent=t;el.style.display='block';setTimeout(()=>el.style.display='none',2600);}document.getElementById('close').onclick=()=>panel.close();panel.addEventListener('click',e=>{if(e.target===panel){const r=panel.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)panel.close();}});
 function member(i){const m=members[i];if(!m)return;show(m.name,row('本日のセッション',m.time+' · 60分')+row('トレーニング内容',m.focus)+row('ご利用状況',m.count)+`<button class="primary" data-begin="${i}">セッションを開始</button>`)}
-const actions={home:()=>panel.close(),members:()=>show('担当会員',members.map((m,i)=>`<button class="detail-row" style="display:block;width:100%;text-align:left" data-member="${i}">${esc(m.name)}<small>${esc(m.focus)} · ${esc(m.count)}</small></button>`).join('')+'<p>ホームに表示されている会員です。</p>'),sessions:()=>show('今日のセッション',members.map((m,i)=>`<button class="detail-row" style="display:block;width:100%;text-align:left" data-member="${i}">${esc(m.time)}　${esc(m.name)}<small>60分 · ${esc(m.focus)}</small></button>`).join('')+`<p>本日${members.length}件のセッションです。</p>`),notifications:()=>show('フォローが必要な会員',alertData.map((a,i)=>`<button class="detail-row" style="display:block;width:100%;text-align:left" data-alert="${i}">${esc(a.title)}<small>詳細を確認 →</small></button>`).join('')),checkins:()=>show('チェックイン確認',row(checkinsPending+'件のチェックインが確認待ち','会員のチェックイン内容はここに表示されます。')),start:()=>show('セッションを開始',members.map((m,i)=>`<button class="primary" data-begin="${i}">${esc(m.time)}　${esc(m.name)}</button>`).join('')),notes:()=>{show('会員メモ','<label for="memo">この端末にメモを保存</label><textarea id="memo" placeholder="セッションの気づきや、次回の確認事項を入力"></textarea><button class="primary" id="save-note">メモを保存</button>');try{document.getElementById('memo').value=localStorage.getItem('gyme-note')||''}catch{}document.getElementById('save-note').onclick=()=>{try{localStorage.setItem('gyme-note',document.getElementById('memo').value);notify('メモをこの端末に保存しました')}catch{notify('保存できませんでした')}}},renewals:()=>show('プラン更新',row('継続プランのご案内','パーソナルトレーニングが残り3回の会員がいます。')+'<p>更新手続きには会員データとの接続が必要です。</p>'),messages:()=>openChatList(),profile:()=>show('プロフィール',row(coachName,'Gyme トレーナー')+row('担当会員',memberTotal+'名'))};
-document.addEventListener('click',e=>{const a=e.target.closest('[data-action]'),m=e.target.closest('[data-member]'),al=e.target.closest('[data-alert]'),begin=e.target.closest('[data-begin]');if(a)actions[a.dataset.action]?.();if(m)member(Number(m.dataset.member));if(al){const d=alertData[Number(al.dataset.alert)];if(!d)return;show(d.title,`<p>${esc(d.detail)}</p>`)}if(begin){const m=members[Number(begin.dataset.begin)];if(!m)return;show('セッション中',row(m.name,m.focus)+row('予定時間','60分')+'<p>この画面内でセッションを開始しました。</p><button class="primary" id="finish">セッションを終了</button>');document.getElementById('finish').onclick=()=>notify('セッションを終了しました')}});
+const actions={home:()=>panel.close(),members:()=>show('担当会員',members.map((m,i)=>`<button class="detail-row" style="display:block;width:100%;text-align:left" data-member="${i}">${esc(m.name)}<small>${esc(m.focus)} · ${esc(m.count)}</small></button>`).join('')+'<p>ホームに表示されている会員です。</p>'),sessions:()=>show('今日のセッション',members.map((m,i)=>`<button class="detail-row" style="display:block;width:100%;text-align:left" data-member="${i}">${esc(m.time)}　${esc(m.name)}<small>60分 · ${esc(m.focus)}</small></button>`).join('')+`<p>本日${members.length}件のセッションです。</p>`),notifications:async()=>{show('通知','<p class="notif-empty">読み込み中…</p>');try{const rows=await pg('/notifications?select=id,type,payload,created_at,read_at&order=created_at.desc&limit=50');notifItems=rows.map(n=>{const[color,icon]=alertStyle[n.type]||['blue','alert'];return{id:n.id,title:n.payload.title,detail:n.payload.detail,short:n.payload.short,created_at:n.created_at,read_at:n.read_at,color,icon}});body.innerHTML=renderNotifList(notifItems);renderIcons(body)}catch(err){console.error('load notifications failed',err);body.innerHTML='<p class="notif-empty">読み込みに失敗しました。</p>'}},checkins:()=>show('チェックイン確認',row(checkinsPending+'件のチェックインが確認待ち','会員のチェックイン内容はここに表示されます。')),start:()=>show('セッションを開始',members.map((m,i)=>`<button class="primary" data-begin="${i}">${esc(m.time)}　${esc(m.name)}</button>`).join('')),notes:()=>{show('会員メモ','<label for="memo">この端末にメモを保存</label><textarea id="memo" placeholder="セッションの気づきや、次回の確認事項を入力"></textarea><button class="primary" id="save-note">メモを保存</button>');try{document.getElementById('memo').value=localStorage.getItem('gyme-note')||''}catch{}document.getElementById('save-note').onclick=()=>{try{localStorage.setItem('gyme-note',document.getElementById('memo').value);notify('メモをこの端末に保存しました')}catch{notify('保存できませんでした')}}},renewals:()=>show('プラン更新',row('継続プランのご案内','パーソナルトレーニングが残り3回の会員がいます。')+'<p>更新手続きには会員データとの接続が必要です。</p>'),messages:()=>openChatList(),profile:()=>show('プロフィール',row(coachName,'Gyme トレーナー')+row('担当会員',memberTotal+'名'))};
+document.addEventListener('click',e=>{const a=e.target.closest('[data-action]'),m=e.target.closest('[data-member]'),al=e.target.closest('[data-alert]'),begin=e.target.closest('[data-begin]');if(a)actions[a.dataset.action]?.();if(m)member(Number(m.dataset.member));if(al){const d=alertData[Number(al.dataset.alert)];if(!d)return;markNotificationRead(d.id);alertData=alertData.filter(x=>x.id!==d.id);renderHome();setBadge('notifications-badge',alertData.length);show(d.title,`<p>${esc(d.detail)}</p>`)}if(begin){const m=members[Number(begin.dataset.begin)];if(!m)return;show('セッション中',row(m.name,m.focus)+row('予定時間','60分')+'<p>この画面内でセッションを開始しました。</p><button class="primary" id="finish">セッションを終了</button>');document.getElementById('finish').onclick=()=>notify('セッションを終了しました')}});
+body.addEventListener('click',e=>{
+  if(e.target.closest('[data-mark-all]')){
+    markAllNotificationsRead(); // fire-and-forget: UI below is optimistic, not waiting on the round trip
+    const now=new Date().toISOString();
+    notifItems=notifItems.map(n=>({...n,read_at:n.read_at||now}));
+    body.innerHTML=renderNotifList(notifItems);renderIcons(body);
+    alertData=[];renderHome();
+    setBadge('notifications-badge',0); // computed locally, not re-fetched: a refetch right after an un-awaited PATCH can race and read the pre-update count
+    return;
+  }
+  const rowBtn=e.target.closest('[data-notif-id]');
+  if(rowBtn){
+    const n=notifItems.find(x=>x.id===rowBtn.dataset.notifId);
+    if(!n)return;
+    if(!n.read_at){
+      n.read_at=new Date().toISOString();
+      markNotificationRead(n.id);
+      alertData=alertData.filter(a=>a.id!==n.id);
+      renderHome();
+      setBadge('notifications-badge',notifItems.filter(x=>!x.read_at).length);
+    }
+    show(n.title,`<p>${esc(n.detail)}</p>`);
+  }
+});
 
 function renderHome(){
   document.getElementById('greeting').textContent=`おはようございます、${coachName}さん`;
@@ -30,7 +54,7 @@ function renderHome(){
   sessionsList.innerHTML=members.length?members.map((m,i)=>`<button class="session" data-member="${i}"><span class="avatar"></span><span class="time"><strong>${esc(m.time)}</strong><small>60分</small></span><span class="session-name"><strong>${esc(m.name)}</strong><small>${esc(m.focus)}</small></span><span class="count">${esc(m.count)}</span><i data-icon="chevron"></i></button>`).join(''):'<p class="detail-row">本日のセッションはありません。</p>';
   renderIcons(sessionsList);
   const alertsList=document.getElementById('alerts-list');
-  alertsList.innerHTML=alertData.map((a,i)=>{const[color,icon]=alertStyle[a.type]||['blue','alert'];return `<button data-alert="${i}"><span class="alert-icon ${color}"><i data-icon="${icon}"></i></span><span><strong>${esc(a.title)}</strong><small>${esc(a.short||a.detail)}</small></span><i data-icon="chevron"></i></button>`}).join('');
+  alertsList.innerHTML=alertData.length?alertData.map((a,i)=>{const[color,icon]=alertStyle[a.type]||['blue','alert'];return `<button data-alert="${i}"><span class="alert-icon ${color}"><i data-icon="${icon}"></i></span><span><strong>${esc(a.title)}</strong><small>${esc(a.short||a.detail)}</small></span><i data-icon="chevron"></i></button>`}).join(''):'<p class="detail-row">フォローが必要な会員はいません。</p>';
   renderIcons(alertsList);
 }
 async function loadHome(){
@@ -59,7 +83,7 @@ async function loadHome(){
       focus:s.workout?.training_plans?.name||'',
       count:subsByMember[s.member_id]||'',
     }));
-    alertData=notifsRes.map(n=>({title:n.payload.title,detail:n.payload.detail,type:n.type,short:n.payload.short}));
+    alertData=notifsRes.map(n=>({id:n.id,title:n.payload.title,detail:n.payload.detail,type:n.type,short:n.payload.short}));
     setBadge('notifications-badge',alertData.length);
     renderHome();
   }catch(err){

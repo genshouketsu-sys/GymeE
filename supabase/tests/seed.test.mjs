@@ -52,6 +52,13 @@ const main = async () => {
     '食事の記録が未提出',
   ].sort());
 
+  // notifications isn't coach-only -- 田中 has his own, and the coach's 3
+  // (scoped to user_id = auth.uid()) must not include it or vice versa.
+  const tanakaNotifs = await asUser(db, TANAKA, `select payload->>'title' as t from public.notifications`);
+  check("田中 sees his own notification, not the coach's", tanakaNotifs, [{ t: '次回のセッションが近づいています' }]);
+  const coachNotifCount = await asUser(db, KENTA, `select count(*)::int as n from public.notifications`);
+  check("coach's notification count excludes 田中's", coachNotifCount, [{ n: 3 }]);
+
   // member/dist home: 1,420/2,200 kcal etc., 72.4kg, workout plan name + exercises
   const nutrition = await asUser(db, TANAKA, `select calories, protein_g, carbs_g, fat_g from public.nutrition_targets where member_id = '${TANAKA}'`);
   check("田中's nutrition target matches member home screen", nutrition, [{ calories: 2200, protein_g: 160, carbs_g: 260, fat_g: 65 }]);

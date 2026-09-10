@@ -17,13 +17,35 @@ document.getElementById('exercise-list').innerHTML='<p class="detail">読み込�
 // Auth) isn't wired up yet -- swap this for the signed-in user's session token.
 const DEV_JWT='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYXV0aGVudGljYXRlZCIsInN1YiI6IjExMTExMTExLTExMTEtMTExMS0xMTExLTExMTExMTExMTExMSIsImV4cCI6MTgyMDQ1NzY2N30.RBVc8xO4CTLVsB6M7y99N_taX3n07qJPiOSovCtd8yg';
 function show(t,html){title.textContent=t;body.innerHTML=html;if(!panel.open)panel.showModal()}
-let exercises=[],memberName='',planName='',planDuration=null,nutritionTarget={calories:0,protein_g:0,carbs_g:0,fat_g:0},nutritionActual={calories:0,protein_g:0,carbs_g:0,fat_g:0},memoText='',weight=null,weeklyDone=0,weeklyTotal=0,streak=0;
+let exercises=[],memberName='',planName='',planDuration=null,nutritionTarget={calories:0,protein_g:0,carbs_g:0,fat_g:0},nutritionActual={calories:0,protein_g:0,carbs_g:0,fat_g:0},memoText='',weight=null,weeklyDone=0,weeklyTotal=0,streak=0,notifItems=[];
+const memberAlertStyle={session_reminder:['blue','calendar']};
 function details(a,b){return `<div class="detail">${esc(a)}<small>${esc(b)}</small></div>`}
 function planSummary(){return (planDuration!=null?planDuration+'分 · ':'')+exercises.length+'種目'}
 function training(){show('今日のトレーニング',details(planName,planSummary())+exercises.map((e,i)=>`<button class="detail" style="width:100%;text-align:left" data-exercise="${i}">${esc(e[0])}<small>${esc(e[1])}</small></button>`).join('')+'<button class="primary" data-action="start">ワークアウトを開始</button>')}
-const actions={home:()=>panel.close(),training,start:()=>{if(sessionActive){show('ワークアウト中',details(planName,'最後のセットまで丁寧に。')+'<button class="primary" id="finish">ワークアウトを終了</button>');document.getElementById('finish').onclick=()=>{sessionActive=false;show('ワークアウト終了','<p>お疲れさまでした。</p>')}}else{sessionActive=true;actions.start()}},nutrition:()=>show('栄養管理',details('カロリー',`${fmt(nutritionActual.calories)} / ${fmt(nutritionTarget.calories)} kcal`)+details('たんぱく質',`${fmt(nutritionActual.protein_g)} / ${fmt(nutritionTarget.protein_g)} g`)+details('炭水化物',`${fmt(nutritionActual.carbs_g)} / ${fmt(nutritionTarget.carbs_g)} g`)+details('脂質',`${fmt(nutritionActual.fat_g)} / ${fmt(nutritionTarget.fat_g)} g`)+'<button class="primary" data-action="food">食事を記録</button>'),progress:()=>show('今週の進捗',details('ワークアウト',`${weeklyDone} / ${weeklyTotal}回`)+details('体重',weight!=null?`${weight} kg`:'記録なし')+details('連続記録',streak+'日')+'<button class="primary" data-action="photo">経過写真を選ぶ</button>'),coach:()=>openChat(),notifications:()=>show('通知',details('コーチメモ',memoText)),food:()=>{show('食事記録','<label for="meal">今日の食事</label><textarea id="meal" placeholder="食べたもの・量を入力"></textarea><button class="primary" id="save-food">この端末に保存</button>');try{document.getElementById('meal').value=localStorage.getItem('gyme-member-meal')||''}catch{}document.getElementById('save-food').onclick=()=>{try{localStorage.setItem('gyme-member-meal',document.getElementById('meal').value);show('保存しました','<p>食事メモをこの端末に保存しました。</p>')}catch{show('保存できませんでした','<p>ブラウザの保存設定をご確認ください。</p>')}}},photo:()=>{show('経過写真','<label for="photo">写真を選んで確認</label><input id="photo" type="file" accept="image/*"><img id="photo-preview" alt="選択した経過写真" hidden><p>選んだ写真はこの画面でのみ表示されます。</p>');document.getElementById('photo').onchange=e=>{const file=e.target.files[0];if(!file)return;if(photoURL)URL.revokeObjectURL(photoURL);photoURL=URL.createObjectURL(file);const image=document.getElementById('photo-preview');image.src=photoURL;image.hidden=false}}};
+const actions={home:()=>panel.close(),training,start:()=>{if(sessionActive){show('ワークアウト中',details(planName,'最後のセットまで丁寧に。')+'<button class="primary" id="finish">ワークアウトを終了</button>');document.getElementById('finish').onclick=()=>{sessionActive=false;show('ワークアウト終了','<p>お疲れさまでした。</p>')}}else{sessionActive=true;actions.start()}},nutrition:()=>show('栄養管理',details('カロリー',`${fmt(nutritionActual.calories)} / ${fmt(nutritionTarget.calories)} kcal`)+details('たんぱく質',`${fmt(nutritionActual.protein_g)} / ${fmt(nutritionTarget.protein_g)} g`)+details('炭水化物',`${fmt(nutritionActual.carbs_g)} / ${fmt(nutritionTarget.carbs_g)} g`)+details('脂質',`${fmt(nutritionActual.fat_g)} / ${fmt(nutritionTarget.fat_g)} g`)+'<button class="primary" data-action="food">食事を記録</button>'),progress:()=>show('今週の進捗',details('ワークアウト',`${weeklyDone} / ${weeklyTotal}回`)+details('体重',weight!=null?`${weight} kg`:'記録なし')+details('連続記録',streak+'日')+'<button class="primary" data-action="photo">経過写真を選ぶ</button>'),coach:()=>openChat(),notifications:async()=>{show('通知','<p class="notif-empty">読み込み中…</p>');try{const rows=await pg('/notifications?select=id,type,payload,created_at,read_at&order=created_at.desc&limit=50');notifItems=rows.map(n=>{const[color,icon]=memberAlertStyle[n.type]||['blue','alert'];return{id:n.id,title:n.payload.title,detail:n.payload.detail,short:n.payload.short,created_at:n.created_at,read_at:n.read_at,color,icon}});body.innerHTML=renderNotifList(notifItems);renderIcons(body)}catch(err){console.error('load notifications failed',err);body.innerHTML='<p class="notif-empty">読み込みに失敗しました。</p>'}},food:()=>{show('食事記録','<label for="meal">今日の食事</label><textarea id="meal" placeholder="食べたもの・量を入力"></textarea><button class="primary" id="save-food">この端末に保存</button>');try{document.getElementById('meal').value=localStorage.getItem('gyme-member-meal')||''}catch{}document.getElementById('save-food').onclick=()=>{try{localStorage.setItem('gyme-member-meal',document.getElementById('meal').value);show('保存しました','<p>食事メモをこの端末に保存しました。</p>')}catch{show('保存できませんでした','<p>ブラウザの保存設定をご確認ください。</p>')}}},photo:()=>{show('経過写真','<label for="photo">写真を選んで確認</label><input id="photo" type="file" accept="image/*"><img id="photo-preview" alt="選択した経過写真" hidden><p>選んだ写真はこの画面でのみ表示されます。</p>');document.getElementById('photo').onchange=e=>{const file=e.target.files[0];if(!file)return;if(photoURL)URL.revokeObjectURL(photoURL);photoURL=URL.createObjectURL(file);const image=document.getElementById('photo-preview');image.src=photoURL;image.hidden=false}}};
 document.getElementById('close').onclick=()=>panel.close();
 document.addEventListener('click',event=>{const a=event.target.closest('[data-action]'),e=event.target.closest('[data-exercise]');if(a)actions[a.dataset.action]?.();if(e){const x=exercises[Number(e.dataset.exercise)];if(!x)return;show(x[0],details('今日のセット',x[1])+'<p>今日は最後のセットを丁寧に。</p><button class="primary" data-action="start">ワークアウトを開始</button>')}});
+body.addEventListener('click',async e=>{
+  if(e.target.closest('[data-mark-all]')){
+    await markAllNotificationsRead();
+    const now=new Date().toISOString();
+    notifItems=notifItems.map(n=>({...n,read_at:n.read_at||now}));
+    body.innerHTML=renderNotifList(notifItems);renderIcons(body);
+    setBadge('notifications-badge',0);
+    return;
+  }
+  const rowBtn=e.target.closest('[data-notif-id]');
+  if(rowBtn){
+    const n=notifItems.find(x=>x.id===rowBtn.dataset.notifId);
+    if(!n)return;
+    if(!n.read_at){
+      n.read_at=new Date().toISOString();
+      markNotificationRead(n.id);
+      setBadge('notifications-badge',notifItems.filter(x=>!x.read_at).length);
+    }
+    show(n.title,`<p>${esc(n.detail)}</p>`);
+  }
+});
 
 function pct(actual,target){return target?Math.round(Math.min(actual/target,1)*100):0}
 function fmt(n){return (n||0).toLocaleString('ja-JP')}

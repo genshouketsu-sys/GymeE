@@ -64,3 +64,26 @@ dialog#chat::backdrop{background:#000c}
 .chat-send i{width:17px;height:17px}
 .chat-send.ready{background:var(--lime);color:#141800}
 @media(min-width:600px){dialog#chat{height:min(720px,100dvh);top:50%;transform:translate(-50%,-50%);border-radius:20px;box-shadow:0 20px 60px #0008}dialog#chat[open]{display:flex}.chat-head{padding-top:14px;border-radius:20px 20px 0 0}}
+
+/* Notification list: rendered inside the existing small #panel dialog (a
+   short read/mark-read list doesn't need #chat's dedicated flex regions),
+   but needs its own row styling -- .detail-row is a bare text line with no
+   room for an icon, unread state or a timestamp. Self-contained class names
+   (not .alert-icon/.red etc.) so this doesn't depend on -- or collide with
+   -- whatever either app's own style.css happens to already define for its
+   home-screen alert cards. */
+.notif-mark-all{display:block;width:100%;text-align:center;padding:9px;margin-bottom:8px;border-radius:10px;background:transparent;border:0.636px solid #ffffff2a;color:var(--lime);font-size:12.5px;font-weight:600}
+.notif-row{display:flex;align-items:center;gap:12px;width:100%;padding:11px 0;text-align:left;border-bottom:0.636px solid #ffffff15}
+.notif-row:last-child{border-bottom:0}
+.notif-icon{flex-shrink:0;height:36px;width:36px;border-radius:50%;display:grid;place-items:center}
+.notif-icon.red{background:#62292966;color:#ed6366}
+.notif-icon.amber{background:#74570e66;color:#f5bd30}
+.notif-icon.blue{background:#34417277;color:#8e9df9}
+.notif-text{flex:1;min-width:0}
+.notif-text strong{display:block;font-size:13.5px;font-weight:600;line-height:1.4}
+.notif-row.read .notif-text strong{font-weight:500;color:var(--muted)}
+.notif-text small{display:block;color:var(--muted);font-size:11.5px;line-height:1.5;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.notif-meta{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.notif-meta time{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.notif-unread-dot{width:7px;height:7px;border-radius:50%;background:var(--lime)}
+.notif-empty{text-align:center;color:var(--muted);font-size:13px;line-height:1.7;padding:32px 12px}

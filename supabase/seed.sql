@@ -140,6 +140,13 @@ insert into public.notifications (id, user_id, type, payload) values
   ('cccccccc-cccc-cccc-cccc-ccccccccccc3', '11111111-1111-1111-1111-111111111101', 'renewal_due', '{"title":"パーソナルトレーニング残り3回","short":"継続プランのご案内がおすすめです","detail":"継続の目標とご希望を確認して、次のプランをご案内しましょう。","member_id":"11111111-1111-1111-1111-111111111113"}')
 on conflict (id) do update set payload = excluded.payload;
 
+-- 田中's own notification -- the notifications table isn't coach-only; a
+-- real member-facing one so the member app's notification center has
+-- something real to show instead of demoing as permanently empty.
+insert into public.notifications (id, user_id, type, payload) values
+  ('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee1', '11111111-1111-1111-1111-111111111111', 'session_reminder', '{"title":"次回のセッションが近づいています","short":"明日 10:00 からのセッションをお忘れなく","detail":"次回のセッションは明日 10:00 からです。忘れずにお越しください。"}')
+on conflict (id) do update set payload = excluded.payload;
+
 -- member home "コーチメモ" / coach's memo feature
 insert into public.conversations (id, coach_id, member_id) values
   ('66666666-6666-6666-6666-666666666601', '11111111-1111-1111-1111-111111111101', '11111111-1111-1111-1111-111111111111')

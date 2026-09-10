@@ -100,3 +100,26 @@ function chatWireInput(){
   chatMessagesEl.addEventListener('click',e=>{const el=e.target.closest('.msg.failed');if(!el)return;const m=chatMessages.find(x=>x.tempId===el.dataset.tempId);if(m)retryChatMessage(m)});
 }
 chatWireInput();
+
+/* -- Notification center: identical rendering/mark-read logic for both
+   apps; each app fetches its own list (coach's are user_id-scoped to the
+   coach, member's to the member -- RLS enforces this regardless) and maps
+   type -> icon/color with its own small style table. -- */
+function relativeTime(iso){
+  const diffMin=Math.floor((Date.now()-new Date(iso).getTime())/60000);
+  if(diffMin<1)return 'たった今';
+  if(diffMin<60)return diffMin+'分前';
+  const hr=Math.floor(diffMin/60);
+  if(hr<24)return hr+'時間前';
+  const day=Math.floor(hr/24);
+  if(day<7)return day+'日前';
+  return chatDateLabel(iso.slice(0,10));
+}
+function renderNotifList(items){
+  if(!items.length)return '<p class="notif-empty">通知はありません。</p>';
+  const anyUnread=items.some(n=>!n.read_at);
+  return (anyUnread?'<button class="notif-mark-all" data-mark-all>すべて既読にする</button>':'')
+    +items.map(n=>`<button class="notif-row${n.read_at?' read':''}" data-notif-id="${n.id}"><span class="notif-icon ${n.color}"><i data-icon="${n.icon}"></i></span><span class="notif-text"><strong>${esc(n.title)}</strong><small>${esc(n.short||n.detail)}</small></span><span class="notif-meta">${n.read_at?'':'<span class="notif-unread-dot"></span>'}<time>${relativeTime(n.created_at)}</time></span></button>`).join('');
+}
+async function markNotificationRead(id){try{await pgPatch(`/notifications?id=eq.${id}`,{read_at:new Date().toISOString()})}catch(err){console.error('markNotificationRead failed',err)}}
+async function markAllNotificationsRead(){try{await pgPatch('/notifications?read_at=is.null',{read_at:new Date().toISOString()})}catch(err){console.error('markAllNotificationsRead failed',err)}}
