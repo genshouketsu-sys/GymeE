@@ -15,9 +15,7 @@
 --
 -- Auth users must exist before public.users can reference them; inserting
 -- into auth.users directly (rather than through Supabase's sign-up flow) is
--- fine for seeding, but these accounts have no password set -- create real
--- credentials via the Supabase dashboard or `supabase auth` before logging
--- in as them.
+-- fine for seeding.
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('11111111-1111-1111-1111-111111111101', 'kenta@gyme.jp', '{"role":"coach","display_name":"健太"}'),
@@ -25,6 +23,18 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('11111111-1111-1111-1111-111111111112', 'sato@example.com', '{"role":"member","display_name":"佐藤 由紀"}'),
   ('11111111-1111-1111-1111-111111111113', 'wang@example.com', '{"role":"member","display_name":"王 明"}')
 on conflict (id) do nothing;
+
+-- Demo login credentials for the seeded accounts (dev only -- obviously not
+-- a real secret). A plain insert...on conflict do nothing wouldn't touch
+-- this on re-seed if the row already existed, so it's a separate update
+-- that always re-applies, same as everything password-related here.
+update auth.users set encrypted_password = crypt('gymedemo2024', gen_salt('bf'))
+where id in (
+  '11111111-1111-1111-1111-111111111101',
+  '11111111-1111-1111-1111-111111111111',
+  '11111111-1111-1111-1111-111111111112',
+  '11111111-1111-1111-1111-111111111113'
+);
 
 insert into public.organizations (id, name) values
   ('11111111-1111-1111-1111-111111111100', 'Gyme')
@@ -48,11 +58,46 @@ insert into public.member_profiles (user_id, coach_id, membership_status) values
   ('11111111-1111-1111-1111-111111111113', '11111111-1111-1111-1111-111111111101', 'active')
 on conflict (user_id) do nothing;
 
--- exercise library (global, org_id null) -- the 3 exercises 田中's today plan shows
+-- exercise library (global, org_id null). The first 3 are what 田中's today
+-- plan shows; the rest exist so the coach's "タスクを割り当てる" preset picker
+-- (member/dist app.js's muscleTileClass and coach/dist app.js's presetOptions
+-- both group by this exact muscle_group text) covers most of what an actual
+-- gym floor has, not just the chest exercises one demo plan happens to use.
 insert into public.exercises (id, name, muscle_group) values
   ('22222222-2222-2222-2222-222222222201', 'ベンチプレス', '胸'),
   ('22222222-2222-2222-2222-222222222202', 'インクラインダンベルプレス', '胸'),
-  ('22222222-2222-2222-2222-222222222203', 'ケーブルフライ', '胸')
+  ('22222222-2222-2222-2222-222222222203', 'ケーブルフライ', '胸'),
+  ('22222222-2222-2222-2222-222222222204', 'ダンベルプレス', '胸'),
+  ('22222222-2222-2222-2222-222222222205', 'プッシュアップ', '胸'),
+  ('22222222-2222-2222-2222-222222222206', 'デッドリフト', '背中'),
+  ('22222222-2222-2222-2222-222222222207', 'ラットプルダウン', '背中'),
+  ('22222222-2222-2222-2222-222222222208', 'ベントオーバーロウ', '背中'),
+  ('22222222-2222-2222-2222-222222222209', '懸垂', '背中'),
+  ('22222222-2222-2222-2222-222222222210', 'シーテッドロウ', '背中'),
+  ('22222222-2222-2222-2222-222222222211', 'ショルダープレス', '肩'),
+  ('22222222-2222-2222-2222-222222222212', 'サイドレイズ', '肩'),
+  ('22222222-2222-2222-2222-222222222213', 'フロントレイズ', '肩'),
+  ('22222222-2222-2222-2222-222222222214', 'リアデルトフライ', '肩'),
+  ('22222222-2222-2222-2222-222222222215', 'バーベルカール', '腕'),
+  ('22222222-2222-2222-2222-222222222216', 'ダンベルカール', '腕'),
+  ('22222222-2222-2222-2222-222222222217', 'トライセプスプッシュダウン', '腕'),
+  ('22222222-2222-2222-2222-222222222218', 'スカルクラッシャー', '腕'),
+  ('22222222-2222-2222-2222-222222222219', 'スクワット', '脚'),
+  ('22222222-2222-2222-2222-222222222220', 'レッグプレス', '脚'),
+  ('22222222-2222-2222-2222-222222222221', 'レッグエクステンション', '脚'),
+  ('22222222-2222-2222-2222-222222222222', 'レッグカール', '脚'),
+  ('22222222-2222-2222-2222-222222222223', 'ランジ', '脚'),
+  ('22222222-2222-2222-2222-222222222224', 'カーフレイズ', '脚'),
+  ('22222222-2222-2222-2222-222222222225', 'ヒップスラスト', 'お尻'),
+  ('22222222-2222-2222-2222-222222222226', 'ブルガリアンスクワット', 'お尻'),
+  ('22222222-2222-2222-2222-222222222227', 'プランク', 'コア'),
+  ('22222222-2222-2222-2222-222222222228', 'クランチ', 'コア'),
+  ('22222222-2222-2222-2222-222222222229', 'レッグレイズ', 'コア'),
+  ('22222222-2222-2222-2222-222222222230', 'ロシアンツイスト', 'コア'),
+  ('22222222-2222-2222-2222-222222222231', 'トレッドミル', '有酸素'),
+  ('22222222-2222-2222-2222-222222222232', 'エアロバイク', '有酸素'),
+  ('22222222-2222-2222-2222-222222222233', 'ローイングマシン', '有酸素'),
+  ('22222222-2222-2222-2222-222222222234', '縄跳び', '有酸素')
 on conflict (id) do nothing;
 
 -- 田中健's plan: "胸 ＋ 上腕三頭筋", 52分 / 7種目 (member app home screen)

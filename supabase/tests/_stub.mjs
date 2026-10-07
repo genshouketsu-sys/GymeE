@@ -35,6 +35,19 @@ grant usage on schema public to authenticated;
 grant select, insert, update, delete on all tables in schema public to authenticated;
 grant usage, select on all sequences in schema public to authenticated;
 grant execute on all functions in schema public to authenticated;
+-- Mirrors the real dev DB's anon setup (see supabase/README.md /
+-- auth_uid_fix.sql applied there by hand): usage only, plus a specific grant
+-- per function that needs to be callable before login -- not the blanket
+-- "all functions" grant authenticated gets, since a real anon role wouldn't
+-- have that either and a test shouldn't pass only because this stub is more
+-- permissive than production.
+create role anon nologin;
+grant usage on schema public to anon;
+grant usage on schema auth to anon;
+grant execute on function public.login(text, text, public.user_role) to anon;
+grant execute on function public.register_member(text, text, text) to anon;
+grant execute on function public.request_password_reset(text) to anon;
+grant execute on function public.reset_password(text, text) to anon;
 `;
 
 export async function freshDb() {
@@ -57,4 +70,11 @@ export async function asUser(db, userId, sql) {
     `begin; set local role authenticated; select set_config('request.jwt.claim.sub', '${userId}', true); ${sql}; commit;`
   );
   return results[3].rows;
+}
+
+// Same idea, but for a request with no identity at all -- e.g. calling
+// login() itself, before there's a sub claim to set.
+export async function asAnon(db, sql) {
+  const results = await db.exec(`begin; set local role anon; ${sql}; commit;`);
+  return results[2].rows;
 }

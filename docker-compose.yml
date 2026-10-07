@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gymedev}
+      POSTGRES_DB: gyme
+      AUTHENTICATOR_PASSWORD: ${AUTHENTICATOR_PASSWORD:-gymedev}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Only 00-init.sh sits where Postgres auto-scans (/docker-entrypoint-initdb.d/).
+      # Everything it needs (role/grant SQL, migrations, seed) is mounted under
+      # /docker-init/ instead, on purpose, so it isn't picked up a second time
+      # by that same scan. See supabase/docker/00-init.sh for the sequence.
+      - ./supabase/docker/00-init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+      - ./supabase/docker/01-auth-and-roles.sql:/docker-init/01-auth-and-roles.sql:ro
+      - ./supabase/docker/02-post-migration-grants.sql:/docker-init/02-post-migration-grants.sql:ro
+      - ./supabase/migrations:/docker-init/migrations:ro
+      - ./supabase/seed.sql:/docker-init/seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d gyme"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Not published to the host on purpose: nothing outside the compose
+    # network needs to reach Postgres directly, and this avoids colliding
+    # with a native Postgres instance a developer may already have on 5432/5433.
+    # For a one-off psql session use:
+    #   docker compose exec postgres psql -U postgres -d gyme
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.8
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${AUTHENTICATOR_PASSWORD:-gymedev}@postgres:5432/gyme
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      # Must stay byte-identical to the secret hardcoded in
+      # supabase/migrations/20260909000017_register_and_reset_password.sql's
+      # mint_jwt() -- that function signs tokens with this value directly in
+      # SQL, there is no shared config file between the two at runtime.
+      PGRST_JWT_SECRET: fba503eeb2af307b1443f6b044c00985a2075751afef7c962fdfc5271923446d
+      PGRST_SERVER_PORT: 3000
+    ports:
+      # coach/dist and member/dist's shared.js hardcode
+      # `http://<page-hostname>:3001` as the API base, so this must stay 3001.
+      - "3001:3000"
+
+  coach:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - postgrest
+    volumes:
+      - ./coach/dist:/usr/share/nginx/html:ro
+    ports:
+      - "8000:80"
+
+  member:
+    image: nginx:alpine
+    restart: unless-stopped
+    depends_on:
+      - postgrest
+    volumes:
+      - ./member/dist:/usr/share/nginx/html:ro
+    ports:
+      - "8001:80"
+
+volumes:
+  pgdata:
